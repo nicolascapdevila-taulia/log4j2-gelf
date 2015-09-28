@@ -27,8 +27,11 @@ import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.Formatter;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Plugin(name = "GELF", category = "Core", elementType = "appender", printObject = true)
 public class GelfAppender extends AbstractAppender {
@@ -90,6 +93,18 @@ public class GelfAppender extends AbstractAppender {
         final Marker marker = event.getMarker();
         if (marker != null) {
             builder.additionalField("marker", marker.getName());
+
+            StringBuilder parentMarkerBuilder = new StringBuilder();
+            Iterator<Marker> markerIterator = resolveMarkers(new HashSet<Marker>(), marker.getParents()).iterator();
+            while (markerIterator.hasNext()) {
+                if (parentMarkerBuilder.length() > 0) {
+                    parentMarkerBuilder.append('\n');
+                }
+                parentMarkerBuilder.append(markerIterator.next().getName());
+            }
+            if (parentMarkerBuilder.length() > 0) {
+                builder.additionalField("parent_markers", parentMarkerBuilder.toString());
+            }
         }
 
         if (includeThreadContext) {
@@ -114,20 +129,13 @@ public class GelfAppender extends AbstractAppender {
         @SuppressWarnings("all")
         final Throwable thrown = event.getThrown();
         if (includeStackTrace && thrown != null) {
-            final StringBuilder stackTraceBuilder = new StringBuilder();
-            for (StackTraceElement stackTraceElement : thrown.getStackTrace()) {
-                new Formatter(stackTraceBuilder).format("%s.%s(%s:%d)%n",
-                        stackTraceElement.getClassName(),
-                        stackTraceElement.getMethodName(),
-                        stackTraceElement.getFileName(),
-                        stackTraceElement.getLineNumber());
-            }
+            final Formatter formatter = buildStackTrace(new Formatter(new StringBuilder()), thrown);
 
             builder.additionalField("exceptionClass", thrown.getClass().getCanonicalName());
             builder.additionalField("exceptionMessage", thrown.getMessage());
-            builder.additionalField("exceptionStackTrace", stackTraceBuilder.toString());
+            builder.additionalField("exceptionStackTrace", formatter.toString());
 
-            builder.fullMessage(event.getMessage().getFormattedMessage() + "\n\n" + stackTraceBuilder.toString());
+            builder.fullMessage(event.getMessage().getFormattedMessage() + "\n\n" + formatter.toString());
         }
         
         if (!additionalFields.isEmpty()) {
@@ -139,6 +147,40 @@ public class GelfAppender extends AbstractAppender {
         } catch (Exception e) {
             throw new AppenderLoggingException("failed to write log event to GELF server: " + e.getMessage(), e);
         }
+    }
+
+    private Formatter buildStackTrace(Formatter formatter, Throwable throwable) {
+
+        for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
+            formatter.format("%s.%s(%s:%d)%n",
+                    stackTraceElement.getClassName(),
+                    stackTraceElement.getMethodName(),
+                    stackTraceElement.getFileName(),
+                    stackTraceElement.getLineNumber());
+        }
+        Throwable nextThrowable = throwable.getCause();
+        if (nextThrowable != null) {
+            formatter.format("%n---> Caused by: %s%n", nextThrowable.getMessage());
+            return buildStackTrace(formatter, nextThrowable);
+        } else {
+            return formatter;
+        }
+
+    }
+
+    private Set<Marker> resolveMarkers(Set<Marker> allMarkers, Marker[] newMarkers) {
+
+        if (newMarkers == null) {
+            return allMarkers;
+        }
+        for (Marker parentMarker : newMarkers) {
+            if (!allMarkers.contains(parentMarker)) {
+                allMarkers.add(parentMarker);
+                resolveMarkers(allMarkers, parentMarker.getParents());
+            }
+        }
+        return allMarkers;
+
     }
 
     @Override
