@@ -138,7 +138,7 @@ public class GelfAppender extends AbstractAppender {
             String exceptionStackTrace = formatter.toString();
             builder.additionalField("exceptionStackTrace", trimImmenseTerm(exceptionStackTrace));
 
-            builder.fullMessage(trimImmenseTerm(event.getMessage().getFormattedMessage() + "\n" + formatter.toString()));
+            builder.fullMessage(event.getMessage().getFormattedMessage() + "\n" + formatter.toString());
         }
         
         if (!additionalFields.isEmpty()) {

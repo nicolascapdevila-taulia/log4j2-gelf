@@ -57,11 +57,10 @@ public class GelfAppenderTest {
 
     private static Exception makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight() {
         try {
-            makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight();
+            return makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight();
         } catch (StackOverflowError e) {
             return new Exception("really long exception message", e);
         }
-        return null;
     }
 
     @AfterClass
