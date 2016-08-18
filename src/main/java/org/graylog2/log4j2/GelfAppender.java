@@ -39,6 +39,8 @@ public class GelfAppender extends AbstractAppender {
 
     private static final Logger LOG = StatusLogger.getLogger();
 
+    private static final int MAX_TERM_LENGTH = 32766;
+
     private final GelfConfiguration gelfConfiguration;
     private final String hostName;
     private final boolean includeSource;
@@ -133,9 +135,10 @@ public class GelfAppender extends AbstractAppender {
 
             builder.additionalField("exceptionClass", thrown.getClass().getCanonicalName());
             builder.additionalField("exceptionMessage", thrown.getMessage());
-            builder.additionalField("exceptionStackTrace", formatter.toString());
+            String exceptionStackTrace = formatter.toString();
+            builder.additionalField("exceptionStackTrace", trimImmenseTerm(exceptionStackTrace));
 
-            builder.fullMessage(event.getMessage().getFormattedMessage() + "\n\n" + formatter.toString());
+            builder.fullMessage(trimImmenseTerm(event.getMessage().getFormattedMessage() + "\n" + formatter.toString()));
         }
         
         if (!additionalFields.isEmpty()) {
@@ -159,10 +162,17 @@ public class GelfAppender extends AbstractAppender {
         }
     }
 
+    private String trimImmenseTerm(String term) {
+        if (term.length() > MAX_TERM_LENGTH) {
+            term = term.substring(0, MAX_TERM_LENGTH);
+        }
+        return term;
+    }
+
     private Formatter buildStackTrace(Formatter formatter, Throwable throwable) {
 
         for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
-            formatter.format("%s.%s(%s:%d)%n",
+            formatter.format("\tat %s.%s(%s:%d)%n",
                     stackTraceElement.getClassName(),
                     stackTraceElement.getMethodName(),
                     stackTraceElement.getFileName(),
@@ -170,7 +180,7 @@ public class GelfAppender extends AbstractAppender {
         }
         Throwable nextThrowable = throwable.getCause();
         if (nextThrowable != null) {
-            formatter.format("%n---> Caused by: %s%n", nextThrowable.getMessage());
+            formatter.format("Caused by: %s%n", nextThrowable.getMessage());
             return buildStackTrace(formatter, nextThrowable);
         } else {
             return formatter;
