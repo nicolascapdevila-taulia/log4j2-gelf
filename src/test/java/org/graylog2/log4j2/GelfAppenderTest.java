@@ -49,6 +49,20 @@ public class GelfAppenderTest {
         ThreadContext.clearAll();
     }
 
+    @Test
+    public void testImmenseStackTrace() throws Exception {
+        final Logger logger = LogManager.getLogger("test");
+        logger.info("This message is huge!", makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight());
+    }
+
+    private static Exception makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight() {
+        try {
+            return makeHugeMessWithSuperLongMethodNameJustSoWeAreSureToBreakThe32kLimitAmIRight();
+        } catch (StackOverflowError e) {
+            return new Exception("really long exception message", e);
+        }
+    }
+
     @AfterClass
     public static void shutdown() throws InterruptedException {
         //need to wait to hope the underlying gelf client pushes the messages.
