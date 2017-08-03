@@ -72,7 +72,8 @@ public class GelfAppender extends AbstractAppender {
                            final boolean includeSource,
                            final boolean includeThreadContext,
                            final boolean includeStackTrace,
-                           final KeyValuePair[] additionalFields,
+                           final String additionalFields,
+                           final KeyValuePair[] additionalFieldKeyPairs,
                            final boolean includeExceptionCause) {
         super(name, filter, layout, ignoreExceptions);
         this.gelfConfiguration = gelfConfiguration;
@@ -82,13 +83,24 @@ public class GelfAppender extends AbstractAppender {
         this.includeStackTrace = includeStackTrace;
         this.includeExceptionCause = includeExceptionCause;
 
-        if (null != additionalFields) {
-            this.additionalFields = new HashMap<>();
-            for (KeyValuePair pair : additionalFields) {
+        this.additionalFields = new HashMap<>();
+        if (null != additionalFields && !additionalFields.isEmpty()) {
+
+            try {
+                String[] values = additionalFields.split(",");
+                for (String s : values) {
+                    String[] nvp = s.split("=");
+                    this.additionalFields.put(nvp[0], nvp[1]);
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Failed to read additional fields.", e);
+            }
+        }
+
+        if (null != additionalFieldKeyPairs) {
+            for (KeyValuePair pair : additionalFieldKeyPairs) {
                 this.additionalFields.put(pair.getKey(), pair.getValue());
             }
-        } else {
-            this.additionalFields = Collections.emptyMap();
         }
     }
 
@@ -297,7 +309,8 @@ public class GelfAppender extends AbstractAppender {
     @SuppressWarnings("unused")
     public static GelfAppender createGelfAppender(@PluginElement("Filter") Filter filter,
                                                   @PluginElement("Layout") Layout<? extends Serializable> layout,
-                                                  @PluginElement(value = "AdditionalFields") final KeyValuePair[] additionalFields,
+                                                  @PluginElement(value = "AdditionalFields") final KeyValuePair[] additionalFieldKeyPairs,
+                                                  @PluginAttribute(value = "additionalFields") String additionalFields,
                                                   @PluginAttribute(value = "name") String name,
                                                   @PluginAttribute(value = "ignoreExceptions", defaultBoolean = true) Boolean ignoreExceptions,
                                                   @PluginAttribute(value = "server", defaultString = "localhost") String server,
@@ -367,7 +380,7 @@ public class GelfAppender extends AbstractAppender {
         }
 
         return new GelfAppender(name, layout, filter, ignoreExceptions, gelfConfiguration, hostName, includeSource,
-                includeThreadContext, includeStackTrace, additionalFields, includeExceptionCause);
+                includeThreadContext, includeStackTrace, additionalFields, additionalFieldKeyPairs, includeExceptionCause);
     }
 
     static boolean isFQDN(String canonicalHostName) {
